@@ -485,20 +485,30 @@ ddns_monitor_stop(){
   fi
 }
 
-# ------------------ 安装自身为 brook 命令 ------------------
+# ------------------ 安装自身为 brook 命令（支持 bash <(curl ...) ） ------------------
 self_install_menu(){
   local target="/usr/local/bin/brook"
-  local self_path
+  local url="https://raw.githubusercontent.com/AKA668/brook/main/brook.sh"
 
-  # 获取当前脚本真实路径
-  self_path=$(readlink -f "$0" 2>/dev/null || echo "$0")
-
-  if [[ "$self_path" != "$target" ]]; then
-    cp -f "$self_path" "$target"
+  # 如果已存在，则只修复权限
+  if [[ -f "$target" ]]; then
     chmod +x "$target"
-    echo -e "${C_GREEN}[OK]${C_RESET} 已安装命令：brook  （以后可直接输入 brook 打开菜单）"
+    return
   fi
+
+  yellow "▶ 正在安装 brook 命令..."
+
+  # 从 GitHub 下载真正的脚本文件，而不是复制 $0
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$url" -o "$target"
+  else
+    wget -qO "$target" "$url"
+  fi
+
+  chmod +x "$target"
+  green "✔ brook 命令安装成功（以后可直接输入 brook 打开菜单）"
 }
+
 
 # ------------------ 菜单 UI ------------------
 show_menu(){
