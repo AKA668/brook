@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =========================================================
-# Brook 一键管理脚本（菜单版 + 自动 DDNS 更新 + 新版核心 -t）
+# Brook 一键管理脚本（支持新版核心 -t + 自动 DDNS + 菜单）
 # 作者：AKA668（逻辑整理 & 优化 by ChatGPT）
 # =========================================================
 
@@ -13,7 +13,7 @@ RULE_FILE="/etc/brook_rules.conf"
 LOG_DIR="/var/log/brook"
 PID_DIR="/var/run"
 DDNS_CACHE_DIR="/var/run/brook_ddns"
-DDNS_INTERVAL=10   # 秒
+DDNS_INTERVAL=10
 
 C_GREEN="\033[32m"
 C_RED="\033[31m"
@@ -23,10 +23,10 @@ C_RESET="\033[0m"
 green(){ echo -e "${C_GREEN}$*${C_RESET}"; }
 red(){ echo -e "${C_RED}$*${C_RESET}"; }
 yellow(){ echo -e "${C_YELLOW}$*${C_RESET}"; }
-pause(){ read -rp "按回车继续..." _; }
+pause(){ read -rp "按回车键继续..." _; }
 
 require_root(){
-  [[ $EUID -ne 0 ]] && { red "❌ 请使用 root 运行"; exit 1; }
+  [[ $EUID -ne 0 ]] && { red "请使用 root 运行脚本！"; exit 1; }
 }
 
 init_env(){
@@ -46,17 +46,17 @@ detect_arch(){
     mipsle) echo "brook_linux_mipsle" ;;
     mips64) echo "brook_linux_mips64" ;;
     mips64le) echo "brook_linux_mips64le" ;;
-    *) echo ""; return 1 ;;
+    *) echo "" ;;
   esac
 }
 
 download_brook_core(){
   local file url tmp
   file=$(detect_arch)
-  [[ -z "$file" ]] && { red "❌ 不支持架构 $(uname -m)"; exit 1; }
+  [[ -z "$file" ]] && { red "不支持的系统架构 $(uname -m)"; exit 1; }
 
-  yellow "▶ 下载 Brook 官方核心：$file"
   url="https://github.com/txthinking/brook/releases/latest/download/$file"
+  yellow "下载 Brook 官方核心：$file"
 
   tmp=$(mktemp)
   if command -v curl >/dev/null; then
@@ -67,8 +67,7 @@ download_brook_core(){
 
   mv "$tmp" "$BROOK_CORE"
   chmod +x "$BROOK_CORE"
-
-  green "✔ Brook 核心安装成功"
+  green "核心已安装：$BROOK_CORE"
 }
 
 is_core_installed(){ [[ -x "$BROOK_CORE" ]]; }
@@ -79,11 +78,11 @@ update_brook(){ download_brook_core; }
 uninstall_brook(){
   if is_core_installed; then
     read -rp "确认卸载 Brook 核心？[y/N]: " c
-    [[ "$c" =~ ^[yY]$ ]] && rm -f "$BROOK_CORE" && green "✔ 已卸载 Brook 核心"
+    [[ "$c" =~ ^[yY]$ ]] && rm -f "$BROOK_CORE" && green "已卸载核心"
   fi
 
   read -rp "是否清空所有规则？[y/N]: " c2
-  [[ "$c2" =~ ^[yY]$ ]] && rm -f "$RULE_FILE" && touch "$RULE_FILE" && green "✔ 已清空规则"
+  [[ "$c2" =~ ^[yY]$ ]] && rm -f "$RULE_FILE" && touch "$RULE_FILE" && green "已清空规则"
 }
 
 # ------------------ 规则管理 ------------------
@@ -96,67 +95,64 @@ print_rules(){
   [[ ! -s "$RULE_FILE" ]] && { yellow "暂无规则"; return; }
 
   printf "\n%-4s %-10s %-25s %-10s %-s\n" "ID" "本地端口" "目标主机" "目标端口" "备注"
-  printf "%s\n" "--------------------------------------------------------------------------"
+  printf "%s\n" "---------------------------------------------------------------------"
 
   while IFS='|' read -r id lp host rp remark; do
-    [[ -z "$id" ]] && continue
     printf "%-4s %-10s %-25s %-10s %-s\n" "$id" "$lp" "$host" "$rp" "$remark"
   done < "$RULE_FILE"
 }
 
 add_single_rule(){
-  yellow "▶ 添加规则"
+  yellow "添加规则"
   read -rp "本地端口: " lp
   read -rp "目标主机(域名/IP): " host
   read -rp "目标端口: " rp
   read -rp "备注: " remark
 
-  [[ -z "$lp" || -z "$host" || -z "$rp" ]] && { red "❌ 参数不足"; return; }
+  [[ -z "$lp" || -z "$host" || -z "$rp" ]] && { red "参数不足"; return; }
 
   id=$(next_rule_id)
   echo "$id|$lp|$host|$rp|$remark" >> "$RULE_FILE"
-  green "✔ 添加成功 ID=$id"
+  green "添加成功：ID=$id"
 }
 
 add_batch_rules(){
-  yellow "▶ 批量添加（空行结束）"
+  yellow "批量添加（空行结束）"
   echo "格式: 本地端口 目标主机 目标端口 备注"
 
   while true; do
     read -rp "> " line
     [[ -z "$line" ]] && break
-
     lp=$(echo "$line" | awk '{print $1}')
     host=$(echo "$line" | awk '{print $2}')
     rp=$(echo "$line" | awk '{print $3}')
     remark=$(echo "$line" | cut -d ' ' -f4-)
-
     id=$(next_rule_id)
     echo "$id|$lp|$host|$rp|$remark" >> "$RULE_FILE"
-    green "✔ 添加 ID=$id"
+    green "添加成功：ID=$id"
   done
 }
 
 delete_rules(){
   print_rules
-  read -rp "要删除的 ID(空格分隔): " ids
+  read -rp "要删除的 ID（空格分隔）: " ids
   [[ -z "$ids" ]] && return
 
   for id in $ids; do stop_rule "$id"; done
 
   tmp=$(mktemp)
   while IFS='|' read -r id lp host rp remark; do
-    del=0
-    for x in $ids; do [[ "$x" == "$id" ]] && del=1; done
-    [[ $del -eq 1 ]] && continue
+    skip=0
+    for x in $ids; do [[ "$x" == "$id" ]] && skip=1; done
+    [[ $skip -eq 1 ]] && continue
     echo "$id|$lp|$host|$rp|$remark" >> "$tmp"
   done < "$RULE_FILE"
-
   mv "$tmp" "$RULE_FILE"
-  green "✔ 已删除"
+
+  green "删除成功"
 }
 
-# ------------------ DNS工具 ------------------
+# ------------------ DNS 工具 ------------------
 resolve_host_realtime(){
   host="$1"
 
@@ -173,7 +169,7 @@ resolve_host_realtime(){
   ping -c1 -W1 "$host" 2>/dev/null | awk -F'[()]' '/PING/{print $2}'
 }
 
-# ------------------ 启动单条规则 ------------------
+# ------------------ 启动规则 ------------------
 start_rule(){
   id="$1"; lp="$2"; host="$3"; rp="$4"; ip_override="$5"
 
@@ -182,39 +178,33 @@ start_rule(){
 
   if [[ -f "$pid_file" ]]; then
     pid=$(cat "$pid_file")
-    [[ -n "$pid" && -d "/proc/$pid" ]] && { yellow "规则 $id 已运行"; return; }
+    [[ -d "/proc/$pid" ]] && { yellow "规则 $id 已运行"; return; }
   fi
 
   ip="${ip_override:-$(resolve_host_realtime "$host")}"
-  [[ -z "$ip" ]] && ip="解析失败"
-
   echo "$ip" > "$DDNS_CACHE_DIR/$id.ip"
 
   nohup "$BROOK_CORE" relay -l ":$lp" -t "${ip}:$rp" >>"$log_file" 2>&1 &
   echo $! > "$pid_file"
-
-  green "✔ 启动规则 $id：:$lp → $host($ip):$rp"
+  green "启动成功：$lp → $host($ip):$rp"
 }
 
-# ------------------ 停止规则 ------------------
 stop_rule(){
   id="$1"
   pid_file="$PID_DIR/brook_${id}.pid"
-
   [[ ! -f "$pid_file" ]] && return
   pid=$(cat "$pid_file")
 
   kill "$pid" 2>/dev/null || true
   sleep 0.2
   [[ -d "/proc/$pid" ]] && kill -9 "$pid"
-
   rm -f "$pid_file"
-  green "✔ 停止规则 $id"
+
+  green "已停止规则 $id"
 }
 
-# ------------------ 启动/停止所有 ------------------
 start_all(){
-  ! is_core_installed && { red "❌ 核心未安装"; return; }
+  ! is_core_installed && { red "未安装核心"; return; }
   [[ ! -s "$RULE_FILE" ]] && { yellow "暂无规则"; return; }
 
   while IFS='|' read -r id lp host rp remark; do
@@ -233,11 +223,10 @@ stop_all(){
   ddns_monitor_stop
 }
 
-# ------------------ 状态 ------------------
 status_all(){
   printf "\n%-4s %-10s %-15s %-25s %-10s %-s\n" \
       "ID" "本地端口" "状态" "目标主机" "目标端口" "备注"
-  printf "%s\n" "----------------------------------------------------------------------------"
+  printf "%s\n" "----------------------------------------------------------------"
 
   while IFS='|' read -r id lp host rp remark; do
     pid_file="$PID_DIR/brook_${id}.pid"
@@ -246,28 +235,23 @@ status_all(){
       pid=$(cat "$pid_file")
       [[ -d "/proc/$pid" ]] && status="running($pid)"
     fi
-
-    printf "%-4s %-10s %-15s %-25s %-10s %-s\n" \
-        "$id" "$lp" "$status" "$host" "$rp" "$remark"
+    printf "%-4s %-10s %-15s %-25s %-10s %-s\n" "$id" "$lp" "$status" "$host" "$rp" "$remark"
   done < "$RULE_FILE"
 }
 
 # ------------------ 日志 ------------------
 view_logs(){
   print_rules
-  read -rp "输入规则 ID 查看日志: " id
-
+  read -rp "请输入规则 ID: " id
   log="$LOG_DIR/$id.log"
   [[ ! -f "$log" ]] && { yellow "无日志"; return; }
-
-  yellow "▶ Ctrl + C 退出"
   tail -f "$log"
 }
 
 # ------------------ 查看 DDNS ------------------
 show_ddns_ips(){
   printf "\n%-4s %-25s %-20s %-s\n" "ID" "主机" "当前解析IP" "备注"
-  printf "%s\n" "----------------------------------------------------------------"
+  printf "%s\n" "-------------------------------------------------------"
 
   while IFS='|' read -r id lp host rp remark; do
     ip=$(resolve_host_realtime "$host")
@@ -276,10 +260,10 @@ show_ddns_ips(){
   done < "$RULE_FILE"
 }
 
-# ------------------ DDNS 自动监控 ------------------
+# ------------------ DDNS 监控 ------------------
 ddns_monitor_loop(){
   log="$LOG_DIR/ddns.log"
-  echo "DDNS 监控启动" > "$log"
+  echo "DDNS 监控已启动" > "$log"
 
   while true; do
     [[ ! -s "$RULE_FILE" ]] && { sleep $DDNS_INTERVAL; continue; }
@@ -288,14 +272,12 @@ ddns_monitor_loop(){
       new_ip=$(resolve_host_realtime "$host")
       cache="$DDNS_CACHE_DIR/$id.ip"
       old_ip=$(cat "$cache" 2>/dev/null || echo "")
-
-      if [[ "$new_ip" != "$old_ip" && "$new_ip" != "解析失败" ]]; then
+      if [[ "$new_ip" != "$old_ip" && "$new_ip" != "" ]]; then
         echo "$(date '+%F %T') $host: $old_ip → $new_ip" >> "$log"
         stop_rule "$id"
         start_rule "$id" "$lp" "$host" "$rp" "$new_ip"
       fi
     done < "$RULE_FILE"
-
     sleep $DDNS_INTERVAL
   done
 }
@@ -310,7 +292,7 @@ ddns_monitor_start(){
   nohup "$BROOK_MENU" --ddns-monitor >/dev/null 2>&1 &
   echo $! > /var/run/brook_ddns.pid
 
-  green "✔ DDNS 自动更新已启动"
+  green "DDNS 自动更新已启动"
 }
 
 ddns_monitor_stop(){
@@ -320,48 +302,41 @@ ddns_monitor_stop(){
     sleep 0.2
     [[ -d "/proc/$pid" ]] && kill -9 "$pid"
     rm -f /var/run/brook_ddns.pid
-    green "✔ DDNS 已停止"
+    green "DDNS 已停止"
   fi
 }
 
-# ------------------ 安装菜单命令（FINAL 修复版） ------------------
+# ------------------ 安装菜单命令 ------------------
 self_install_menu(){
-
-  # 🔥 如果脚本是通过 curl 管道执行（$0 是 /proc/...），禁止复制
-  if [[ "$0" =~ ^/proc/ ]] || [[ "$0" =~ ^pipe: ]] || [[ "$0" =~ ^/dev/fd/ ]]; then
-    yellow "⚠ 使用 curl 管道运行，跳过安装 brook 命令"
-    return
-  fi
-
   self_path=$(readlink -f "$0" 2>/dev/null || echo "$0")
   bro_path=$(readlink -f "$BROOK_MENU" 2>/dev/null || echo "$BROOK_MENU")
 
   if [[ -f "$self_path" && "$self_path" != "$bro_path" ]]; then
     cp "$self_path" "$BROOK_MENU"
     chmod +x "$BROOK_MENU"
-    green "✔ 已安装命令：brook"
+    green "已安装命令：brook"
   fi
 }
 
-# ------------------ 菜单 ------------------
+# ------------------ 菜单界面 ------------------
 show_menu(){
   clear
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo "  0. 升级 Brook 核心"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "  1. 安装 Brook"
+  echo "  1. 安装 Brook 核心"
   echo "  2. 更新 Brook"
   echo "  3. 卸载 Brook"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "  4. 启动 Brook"
-  echo "  5. 停止 Brook"
-  echo "  6. 重启 Brook"
+  echo "  4. 启动所有转发"
+  echo "  5. 停止所有转发"
+  echo "  6. 重启所有转发"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "  7. 设置 端口转发（可批量）"
-  echo "  8. 查看 端口转发"
-  echo "  9. 查看 日志"
-  echo " 10. 查看 DDNS 最新 IP"
-  echo " 11. 查看 运行状态"
+  echo "  7. 设置端口转发规则"
+  echo "  8. 查看规则列表"
+  echo "  9. 查看日志"
+  echo " 10. 查看 DDNS 最新解析"
+  echo " 11. 查看运行状态"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
   if is_core_installed; then
@@ -370,7 +345,7 @@ show_menu(){
       && echo -e " 当前状态：${C_GREEN}已安装 / 有运行规则${C_RESET}" \
       || echo -e " 当前状态：${C_GREEN}已安装 / 未运行${C_RESET}"
   else
-    echo -e " 当前状态：${C_RED}未安装${C_RESET}"
+    echo -e " 当前状态：${C_RED}未安装核心${C_RESET}"
   fi
 
   echo -n "请输入数字 [0-11]: "
@@ -380,12 +355,12 @@ menu_forward(){
   while true; do
     clear
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "  7. 端口转发管理"
+    echo "  端口转发管理"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "  1. 添加单条规则"
     echo "  2. 批量添加规则"
-    echo "  3. 批量删除规则"
-    echo "  0. 返回"
+    echo "  3. 删除规则"
+    echo "  0. 返回主菜单"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     read -rp "选择: " a
     case "$a" in
@@ -403,7 +378,6 @@ main(){
   require_root
   init_env
 
-  # 隐藏模式：DDNS 守护进程
   if [[ "$1" == "--ddns-monitor" ]]; then
     ddns_monitor_loop
     exit 0
