@@ -333,17 +333,22 @@ ddns_monitor_stop(){
   fi
 }
 
-# ------------------ 安装自身为 brook 命令（优化版） ------------------
+# ------------------ 安装自身为 brook 命令（最终版） ------------------
 self_install_menu(){
-  self_path=$(readlink -f "$0")
-  bro_path=$(readlink -f "$BROOK_MENU")
+  local target="/usr/local/bin/brook"
 
-  if [[ "$self_path" != "$bro_path" ]]; then
-    cp "$self_path" "$BROOK_MENU"
-    chmod +x "$BROOK_MENU"
-    green "✔ 已安装为命令：brook"
+  # 当前脚本真实路径
+  local self_path
+  self_path=$(readlink -f "$0")
+
+  # 如果当前脚本不是 /usr/local/bin/brook，则复制自身
+  if [[ "$self_path" != "$target" ]]; then
+    cp -f "$self_path" "$target"
+    chmod +x "$target"
+    echo -e "\033[32m[OK]\033[0m 已成功安装命令：brook  （以后可直接输入 brook 运行）"
   fi
 }
+
 
 # ------------------ 菜单 ------------------
 show_menu(){
@@ -401,23 +406,6 @@ menu_forward(){
   done
 }
 
-# ------------------ 自安装功能 ------------------
-self_install_menu() {
-  local target="/usr/local/bin/brook"
-
-  # 判断当前执行文件是否就是 /usr/local/bin/brook
-  if [[ "$(realpath "$0")" == "$target" ]]; then
-    return
-  fi
-
-  # 如果不存在 brook 命令，则复制自身
-  if [[ ! -e "$target" ]]; then
-    cp -f "$0" "$target"
-    chmod +x "$target"
-    echo -e "\033[32m[OK]\033[0m 已成功安装命令：brook  （下次可直接输入 brook 启动菜单）"
-  fi
-}
-# ------------------ 主入口 ------------------
 main() {
   require_root
   init_env
