@@ -91,17 +91,26 @@ Download_brook(){
 	cd ${file} || exit 1
 	echo -e "${Info} 开始下载 Brook ${Green_font_prefix}${brook_new_ver}${Font_color_suffix}"
 
+	# AMD64 / x86_64
 	if [[ ${bit} == "x86_64" ]] || [[ ${bit} == "amd64" ]]; then
-		wget --no-check-certificate -N "https://github.com/AKA668/brook/releases/download/${brook_new_ver}/brook"
+		wget --no-check-certificate -N "https://github.com/AKA668/brook/releases/download/${brook_new_ver}/brook_linux_amd64"
+		[[ -f brook_linux_amd64 ]] && mv brook_linux_amd64 brook
+
+	# 386
 	elif [[ ${bit} == "i386" ]] || [[ ${bit} == "i686" ]]; then
 		wget --no-check-certificate -N "https://github.com/AKA668/brook/releases/download/${brook_new_ver}/brook_linux_386"
 		[[ -f brook_linux_386 ]] && mv brook_linux_386 brook
+
+	# ARMv7 / ARMv6
 	elif [[ ${bit} == "armv7l" ]] || [[ ${bit} == "armv6l" ]]; then
 		wget --no-check-certificate -N "https://github.com/AKA668/brook/releases/download/${brook_new_ver}/brook_linux_arm7"
 		[[ -f brook_linux_arm7 ]] && mv brook_linux_arm7 brook
+
+	# ARM64 / AARCH64
 	elif [[ ${bit} == "aarch64" ]] || [[ ${bit} == "arm64" ]]; then
 		wget --no-check-certificate -N "https://github.com/AKA668/brook/releases/download/${brook_new_ver}/brook_linux_arm64"
 		[[ -f brook_linux_arm64 ]] && mv brook_linux_arm64 brook
+
 	else
 		echo -e "${Error} 暂不支持该架构：${bit}" && exit 1
 	fi
@@ -110,6 +119,7 @@ Download_brook(){
 	chmod +x brook
 	echo -e "${Info} Brook 下载完成：${Green_font_prefix}${brook_file}${Font_color_suffix}"
 }
+
 
 check_ver_comparison(){
 	brook_now_ver=$(${brook_file} -v 2>/dev/null | awk '{print $3}')
