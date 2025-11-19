@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =========================================================
-# Brook 一键管理脚本（菜单版 + 自动 DDNS 更新 + 官方最新版 core -t）
-# 原作者：Toyo   二次整理 & 重构：AKA668 + ChatGPT
+# Brook 一键管理脚本
+# 作者：AKA668 + ChatGPT
 #
 # 使用方式：
 #   bash <(curl -Ls https://raw.githubusercontent.com/AKA668/brook/main/brook.sh)
@@ -15,11 +15,11 @@
 #   - 默认启动 DDNS 守护进程（监控域名 IP 变化，自动重启对应转发）
 #
 # 菜单功能：
-#   0. 升级管理脚本（重新拉取 GitHub 上的 brook.sh）
+#   0. 升级管理脚本
 #   1. 安装 Brook 核心
 #   2. 更新 Brook 核心
 #   3. 卸载 Brook
-#   4. 启动 Brook 端口转发（根据规则文件）
+#   4. 启动 Brook 端口转发
 #   5. 停止 Brook 端口转发
 #   6. 重启 Brook 端口转发
 #   7. 设置端口转发（单条/批量增删）
@@ -515,17 +515,15 @@ show_menu(){
   clear
   echo "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
   echo "┃ Brook 端口转发 一键管理脚本 [v${sh_ver}] ┃"
-  echo "┃   机场搭建 ❤ 机场托管 ❤ 技术支持       ┃"
-  echo "┃   Telegram: https://t.me/bojiiking  ┃"
   echo "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
   echo "━━━━━━━━━━━━ 功能菜单 ━━━━━━━━━━━━"
-  echo "  0. 升级管理脚本（重新拉取 brook.sh）"
+  echo "  0. 升级管理脚本"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo "  1. 安装 Brook 核心"
   echo "  2. 更新 Brook 核心"
   echo "  3. 卸载 Brook（可选清空规则）"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "  4. 启动 Brook 转发（根据规则文件）"
+  echo "  4. 启动 Brook 转发"
   echo "  5. 停止 Brook 转发"
   echo "  6. 重启 Brook 转发"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
